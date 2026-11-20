@@ -1,0 +1,2570 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>棒球九宮格・18關傳奇制霸</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --orange: #ff7a18;
+    --orange-deep: #d95204;
+    --gold: #fbbf24;
+    --gold-deep: #b45309;
+    --glass: rgba(15, 23, 42, 0.78);
+    --glass-border: rgba(255, 255, 255, 0.16);
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    background: #111318;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    color: #fff;
+    touch-action: none;
+  }
+  #game-wrap {
+    position: relative;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    background: #14171f;
+  }
+  #game-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  /* Minimalist Top HUD */
+  #hud {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    left: 10px;
+    right: 10px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #hud.visible { display: flex; }
+  .hud-pill {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.34);
+    font-size: clamp(11.5px, 3.2vw, 13.5px);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    pointer-events: auto;
+    max-width: calc(100vw - 104px);
+  }
+  .hud-stage {
+    color: var(--gold);
+    white-space: nowrap;
+  }
+  .hud-sep {
+    width: 1px;
+    height: 13px;
+    background: rgba(255,255,255,0.2);
+    flex-shrink: 0;
+  }
+  .hud-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .hud-stat.clutch {
+    color: #fb7185;
+    animation: clutchPulse 0.85s ease-in-out infinite;
+  }
+  @keyframes clutchPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.75; transform: scale(1.08); }
+  }
+  .hud-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffb347, #f97316 65%, #c2410c);
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.75);
+    flex-shrink: 0;
+  }
+  .hud-target-badge {
+    color: #fde68a;
+  }
+  .hud-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: auto;
+    flex-shrink: 0;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #fff;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    transition: transform 0.14s ease, background 0.18s ease;
+  }
+  .icon-btn:active { transform: scale(0.92); }
+  .icon-btn:hover { background: rgba(30, 41, 59, 0.92); }
+
+  /* Floating Top-Right Sound Button on Home */
+  #home-audio-btn {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+    z-index: 25;
+  }
+
+  /* Sub Banner for Special Stage Mechanics */
+  #sub-banner {
+    position: absolute;
+    top: calc(max(12px, env(safe-area-inset-top)) + 46px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    pointer-events: none;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    border-radius: 999px;
+    padding: 5px 13px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fef3c7;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    white-space: nowrap;
+    max-width: 94vw;
+  }
+  #sub-banner.visible { display: flex; }
+  .target-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #fbbf24, #d97706);
+    color: #111827;
+    font-size: 13px;
+    font-weight: 900;
+    transition: all 0.25s ease;
+  }
+  .target-chip.done {
+    background: rgba(34, 197, 94, 0.24);
+    color: #4ade80;
+    border: 1px solid #4ade80;
+    text-decoration: line-through;
+    transform: scale(0.86);
+  }
+
+  /* Minimalist Home Screen Overlay */
+  #home-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: max(56px, env(safe-area-inset-top) + 32px) 24px max(40px, env(safe-area-inset-bottom) + 28px);
+    background: radial-gradient(circle at 50% 34%, rgba(15, 23, 42, 0.16) 0%, rgba(10, 14, 24, 0.74) 100%);
+    transition: opacity 0.35s ease;
+  }
+  #home-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .title-block {
+    text-align: center;
+    margin-top: 4vh;
+  }
+  .title-kicker {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: rgba(255, 122, 24, 0.22);
+    border: 1px solid rgba(255, 168, 76, 0.58);
+    color: #fed7aa;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    margin-bottom: 12px;
+  }
+  .game-title {
+    margin: 0;
+    font-size: clamp(38px, 9.5vw, 60px);
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    line-height: 1.08;
+    background: linear-gradient(180deg, #ffffff 0%, #ffedd5 55%, #fb923c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.65));
+  }
+  .home-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: min(290px, 84vw);
+    margin-bottom: 3vh;
+  }
+  .btn-primary {
+    width: 100%;
+    border: none;
+    border-radius: 18px;
+    padding: 16px 24px;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    color: #fff;
+    background: linear-gradient(180deg, #ff922b 0%, #ea580c 100%);
+    box-shadow: 0 10px 28px rgba(234, 88, 12, 0.5), inset 0 1px 0 rgba(255,255,255,0.42);
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary:active { transform: scale(0.96); }
+  .btn-secondary {
+    width: 100%;
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 16px;
+    padding: 13px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.68);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .btn-secondary:hover { background: rgba(30, 41, 59, 0.85); }
+  .btn-secondary:active { transform: scale(0.96); }
+
+  /* Modals */
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(8, 12, 22, 0.74);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    width: min(410px, 92vw);
+    max-height: 84dvh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, rgba(24, 32, 48, 0.97) 0%, rgba(14, 20, 32, 0.99) 100%);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 24px;
+    padding: 24px 22px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.68);
+    text-align: center;
+    animation: popIn 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.9) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .modal-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 46px;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 6px 14px rgba(251, 191, 36, 0.4));
+  }
+  .modal-title {
+    margin: 0 0 8px;
+    font-size: 23px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0.03em;
+  }
+  .modal-sub {
+    margin: 0 0 18px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: #cbd5e1;
+  }
+  .rules-list {
+    text-align: left;
+    margin: 0 0 20px;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #e2e8f0;
+  }
+  .rules-list li {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .rules-list strong { color: #fbbf24; }
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat-box {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 10px 8px;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fbbf24;
+    margin-top: 2px;
+  }
+  .modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .medal-glow {
+    font-size: 64px;
+    display: inline-block;
+    margin: 4px 0 8px;
+    animation: floatMedal 2.2s ease-in-out infinite;
+    filter: drop-shadow(0 0 24px rgba(251, 191, 36, 0.78));
+  }
+  @keyframes floatMedal {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-7px) scale(1.06); }
+  }
+
+  /* Floating feedback toast */
+  #toast {
+    position: absolute;
+    left: 50%;
+    top: 44%;
+    transform: translate(-50%, -50%) scale(0.85);
+    z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    text-align: center;
+    transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    white-space: nowrap;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translate(-50%, -62%) scale(1);
+  }
+  .toast-main {
+    font-size: 25px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-shadow: 0 4px 18px rgba(0,0,0,0.82);
+  }
+  .toast-sub {
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #fde68a;
+    margin-top: 2px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.85);
+  }
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Minimalist Home Audio Toggle -->
+  <button id="home-audio-btn" class="icon-btn" aria-label="音樂與音效開關" title="音樂/音效">🔊</button>
+
+  <!-- Minimalist In-Game HUD -->
+  <div id="hud">
+    <div class="hud-pill">
+      <span id="hud-stage" class="hud-stage">第 1 關</span>
+      <span class="hud-sep"></span>
+      <span id="hud-balls-wrap" class="hud-stat"><span class="hud-dot"></span><span id="hud-balls">12 球</span></span>
+      <span class="hud-sep"></span>
+      <span id="hud-progress" class="hud-stat hud-target-badge">0 / 9</span>
+    </div>
+    <div class="hud-right">
+      <button id="hud-rules-btn" class="icon-btn" aria-label="遊戲規則" title="遊戲規則">？</button>
+      <button id="hud-audio-btn" class="icon-btn" aria-label="音樂與音效開關" title="音樂/音效">🔊</button>
+    </div>
+  </div>
+
+  <!-- Dynamic Mechanic Sub-Banner -->
+  <div id="sub-banner"></div>
+
+  <!-- Impact Floating Feedback -->
+  <div id="toast">
+    <div id="toast-main" class="toast-main"></div>
+    <div id="toast-sub" class="toast-sub"></div>
+  </div>
+
+  <!-- Minimalist Home Screen -->
+  <div id="home-screen">
+    <div class="title-block">
+      <div class="title-kicker">18-STAGE CARNIVAL CHAMPIONSHIP</div>
+      <h1 class="game-title">棒球九宮格</h1>
+    </div>
+    <div class="home-actions">
+      <button id="btn-start" class="btn-primary">開始遊戲</button>
+      <button id="btn-rules" class="btn-secondary">遊戲規則</button>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rules-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-badge">⚾</div>
+      <h2 class="modal-title">18 關完整規則</h2>
+      <ul class="rules-list">
+        <li><strong>第 1～3 關｜全制霸晉級賽</strong><br>12 球清 1 座（9 格）、22 球清 2 座（18 格）、32 球清 3 座（27 格），全中晉級。</li>
+        <li><strong>第 4～7 關｜另類狙擊賽</strong><br>僅有 <strong>6 顆球</strong>，精準擊中 1 座九宮格中隨機點名的 <strong>3 → 4 → 5 → 6 個指定號碼</strong>。</li>
+        <li><strong>第 8 關｜OOXX 投球對決</strong><br>與設計師輪流投球玩 OOXX，先連線者贏得 <strong>🏅 晉級金牌</strong> 並解鎖十大傳奇延伸賽！</li>
+        <li><strong>第 9～18 關｜十大創意極限延伸賽</strong><br>強側風偏移、左右滑軌靶架、1→9 依序點名、地鼠快閃板、💣 避雷禁區、黃金連擊搶分、暗夜霓虹瞬閃、雙座風雲變幻、7 球雙賓果連線，以及壓軸 <strong>動態 OOXX 三戰兩勝大魔王</strong> 奪取 🏆🏅！</li>
+        <li><strong>投球手感訣竅</strong><br>按住螢幕拖曳瞄準（觸控時準心會自動上移防手指遮擋），待<strong>收束環轉為翡翠綠</strong>放開投球，飆出 145+ km/h 紅中速球！</li>
+      </ul>
+      <div class="modal-actions">
+        <button id="btn-close-rules" class="btn-primary">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage Clear / Fail / Victory Modal -->
+  <div id="result-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div id="res-icon" class="modal-badge">🎯</div>
+      <h2 id="res-title" class="modal-title">關卡通過！</h2>
+      <p id="res-sub" class="modal-sub"></p>
+      <div id="res-stats" class="stat-row"></div>
+      <div id="res-actions" class="modal-actions"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // =========================================================================
+  // 1. 18-STAGE CHAMPIONSHIP DEFINITIONS (Original 8 + 10 Creative Extensions)
+  // =========================================================================
+  const STAGES = [
+    // --- Chapter 1: 全制霸晉級賽 ---
+    { id: 1, name: '第 1 關', short: '第 1 關', title: '單座全制霸', mode: 'clear', boards: 1, balls: 12, targets: 9, sway: 0.80, desc: '12 顆球打中 1 座九宮格全部 9 個號碼' },
+    { id: 2, name: '第 2 關', short: '第 2 關', title: '雙座全制霸', mode: 'clear', boards: 2, balls: 22, targets: 18, sway: 0.90, desc: '22 顆球打中 2 座九宮格全部 18 個號碼' },
+    { id: 3, name: '第 3 關', short: '第 3 關', title: '三座全制霸', mode: 'clear', boards: 3, balls: 32, targets: 27, sway: 0.98, desc: '32 顆球打中 3 座九宮格全部 27 個號碼' },
+    // --- Chapter 2: 另類狙擊賽 ---
+    { id: 4, name: '第 4 關', short: '第 4 關', title: '另類狙擊・3 號', mode: 'sniper', boards: 1, balls: 6, targets: 3, sway: 1.02, desc: '6 顆球打中隨機指定的 3 個號碼' },
+    { id: 5, name: '第 5 關', short: '第 5 關', title: '另類狙擊・4 號', mode: 'sniper', boards: 1, balls: 6, targets: 4, sway: 1.06, desc: '6 顆球打中隨機指定的 4 個號碼' },
+    { id: 6, name: '第 6 關', short: '第 6 關', title: '另類狙擊・5 號', mode: 'sniper', boards: 1, balls: 6, targets: 5, sway: 1.10, desc: '6 顆球打中隨機指定的 5 個號碼' },
+    { id: 7, name: '第 7 關', short: '第 7 關', title: '極限狙擊・6 號', mode: 'sniper', boards: 1, balls: 6, targets: 6, sway: 1.14, desc: '6 顆球零失誤全中指定的 6 個號碼' },
+    // --- Chapter 3: 經典 OOXX 奪牌戰 ---
+    { id: 8, name: '第 8 關', short: 'OOXX 對決', title: 'OOXX 投球對決', mode: 'ooxx', boards: 1, balls: 99, targets: 1, sway: 1.08, desc: '與設計師輪流投球玩 OOXX，先連線者奪得 🏅 並晉級延伸賽！' },
+    // --- Chapter 4: 十大創意極限延伸賽 (Stages 9 - 18) ---
+    { id: 9, name: '第 9 關', short: '第 9 關・強風', title: '強側風偏移戰', mode: 'wind', boards: 1, balls: 14, targets: 9, sway: 0.92, windMax: 52, desc: '側風會吹偏球路！看準風向修正落點，14 球清完 9 格' },
+    { id: 10, name: '第 10 關', short: '第 10 關・滑軌', title: '左右搖擺靶架', mode: 'moving', boards: 1, balls: 14, targets: 9, sway: 0.88, moveSpeed: 1.45, desc: '九宮格裝上電動滑軌左右移動，預判提前量 14 球全清！' },
+    { id: 11, name: '第 11 關', short: '第 11 關・依序', title: '1→9 閃電點名', mode: 'sequence', boards: 1, balls: 13, targets: 9, sway: 1.02, desc: '必須嚴格依照 1→2→3…→9 的順序依序擊落，打錯不計！' },
+    { id: 12, name: '第 12 關', short: '第 12 關・快閃', title: '地鼠快閃九宮格', mode: 'popup', boards: 1, balls: 12, targets: 7, sway: 0.95, desc: '每 1.5 秒隨機翻起 2 塊亮燈面板，12 球內快手擊中 7 次！' },
+    { id: 13, name: '第 13 關', short: '第 13 關・避雷', title: '地雷禁區避彈賽', mode: 'bomb', boards: 1, balls: 10, targets: 6, sway: 1.04, desc: '10 球擊中 6 塊黃金數字格，絕不可砸中 3 顆紅色 💣 地雷！' },
+    { id: 14, name: '第 14 關', short: '第 14 關・搶分', title: '黃金連擊狂潮', mode: 'score', boards: 1, balls: 10, targets: 1600, sway: 1.02, desc: '瞄準高分紅中與移動 2× 倍率格，疊加連擊 10 球衝破 1600 分！' },
+    { id: 15, name: '第 15 關', short: '第 15 關・暗夜', title: '暗夜霓虹瞬閃', mode: 'blackout', boards: 1, balls: 14, targets: 9, sway: 0.96, desc: '夜市跳電！靠每 2.2 秒的霓虹閃光記憶位置，14 球清完 9 格！' },
+    { id: 16, name: '第 16 關', short: '第 16 關・雙亂', title: '雙座風雲變幻', mode: 'twin_chaos', boards: 2, balls: 26, targets: 18, sway: 0.95, windMax: 36, moveSpeed: 1.25, desc: '2 座動態滑移九宮格加上陣風干擾，26 球內制霸 18 格！' },
+    { id: 17, name: '第 17 關', short: '第 17 關・賓果', title: '7 球雙賓果連線', mode: 'bingo', boards: 1, balls: 7, targets: 2, sway: 1.06, desc: '閃過鋼鐵封鎖格 🔒，用 7 顆球策略搶點打出 2 條賓果連線！' },
+    { id: 18, name: '第 18 關', short: '最終大魔王', title: '動態 OOXX 三戰兩勝', mode: 'ooxx_boss', boards: 1, balls: 99, targets: 2, sway: 1.08, windMax: 28, moveSpeed: 1.15, desc: '移動靶架＋側風！與傳奇大魔王進行 OOXX 搶 2 勝奪 🏆🏅！' }
+  ];
+
+  const WIN_LINES = [
+    [0,1,2], [3,4,5], [6,7,8],
+    [0,3,6], [1,4,7], [2,5,8],
+    [0,4,8], [2,4,6]
+  ];
+
+  const SCORE_VALUES = [200, 150, 200, 150, 300, 150, 200, 150, 200];
+
+  // =========================================================================
+  // 2. AUDIO ENGINE (64-second Procedural Stadium Carnival BGM + Realistic SFX)
+  // =========================================================================
+  class SoundEngine {
+    constructor() {
+      this.ctx = null;
+      this.muted = false;
+      this.bgmTimer = null;
+      this.bgmStep = 0;
+      this.bgmPlaying = false;
+      this.masterGain = null;
+      this.bgmGain = null;
+      this.sfxGain = null;
+      this.noiseBuf = null;
+    }
+
+    init() {
+      if (this.ctx) {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return;
+      }
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      this.ctx = new AudioCtx();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = this.muted ? 0 : 0.85;
+      this.masterGain.connect(this.ctx.destination);
+
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.value = 0.24;
+      this.bgmGain.connect(this.masterGain);
+
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 0.9;
+      this.sfxGain.connect(this.masterGain);
+
+      const sr = this.ctx.sampleRate;
+      this.noiseBuf = this.ctx.createBuffer(1, Math.floor(sr * 1.5), sr);
+      const data = this.noiseBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+
+    toggleMute() {
+      this.muted = !this.muted;
+      if (this.masterGain && this.ctx) {
+        this.masterGain.gain.setTargetAtTime(this.muted ? 0 : 0.85, this.ctx.currentTime, 0.04);
+      }
+      const icon = this.muted ? '🔇' : '🔊';
+      document.getElementById('home-audio-btn').textContent = icon;
+      document.getElementById('hud-audio-btn').textContent = icon;
+    }
+
+    startBGM() {
+      this.init();
+      if (!this.ctx || this.bgmPlaying) return;
+      this.bgmPlaying = true;
+      const stepMs = 250;
+      const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+      const chordProg = [
+        [60,64,67],[55,59,62],[57,60,64],[53,57,60],[60,64,67],[53,57,60],[50,53,57],[55,59,62],
+        [53,57,60],[55,59,62],[52,55,59],[57,60,64],[50,53,57],[55,59,62],[60,64,67],[60,64,67,70],
+        [57,60,64],[52,55,59],[53,57,60],[60,64,67],[50,53,57],[57,60,64],[53,57,60],[55,59,62],
+        [60,64,67],[52,56,59],[57,60,64],[53,57,60],[55,60,64],[55,59,62],[53,57,60],[55,59,65]
+      ];
+      const bassNotes = [
+        48,43,45,41, 48,41,38,43,
+        41,43,40,45, 38,43,48,48,
+        45,40,41,48, 38,45,41,43,
+        48,40,45,41, 43,43,41,43
+      ];
+      const melodyPatterns = [
+        [72,0,76,79, 0,76,74,72],
+        [74,0,71,67, 71,74,76,0],
+        [72,0,76,79, 81,79,76,72],
+        [77,0,76,74, 72,0,69,0],
+        [79,76,72,0, 74,76,79,84],
+        [81,0,79,77, 76,74,72,0],
+        [74,77,81,0, 79,77,74,71],
+        [79,0,76,74, 72,0,0,0]
+      ];
+
+      const playStep = () => {
+        if (!this.bgmPlaying || !this.ctx) return;
+        const now = this.ctx.currentTime + 0.02;
+        const step = this.bgmStep % 256;
+        const bar = Math.floor(step / 8);
+        const beat = step % 8;
+        const section = Math.floor(bar / 8);
+        const chord = chordProg[bar];
+        const bass = bassNotes[bar];
+
+        if (beat === 0 || (beat === 4 && section !== 2) || (section === 2 && beat === 3)) this._kick(now, 0.32);
+        if (beat === 2 || beat === 6) this._snare(now, section === 3 ? 0.16 : 0.11);
+        if (beat % 2 === 1) this._hihat(now, 0.045);
+
+        if (beat === 0 || beat === 4) {
+          const bNote = beat === 0 ? bass : bass + (bar % 2 === 0 ? 7 : 5);
+          this._organNote(now, midiToFreq(bNote), 0.38, 0.22, 'triangle');
+        } else if (beat === 6 && section >= 1) {
+          this._organNote(now, midiToFreq(bass + 2), 0.18, 0.15, 'triangle');
+        }
+
+        if (beat === 0 || beat === 3 || beat === 6) {
+          const vol = beat === 0 ? 0.09 : 0.055;
+          chord.forEach((m) => this._organNote(now, midiToFreq(m), 0.24, vol, 'sine'));
+        }
+
+        const pat = melodyPatterns[(bar + section * 2) % melodyPatterns.length];
+        const mNote = pat[beat];
+        if (mNote > 0) {
+          const transpose = section === 2 ? -3 : 0;
+          const wave = section === 3 ? 'sawtooth' : 'triangle';
+          this._leadNote(now, midiToFreq(mNote + transpose), 0.22, section === 2 ? 0.09 : 0.12, wave);
+        }
+        this.bgmStep = (this.bgmStep + 1) % 256;
+      };
+
+      playStep();
+      this.bgmTimer = setInterval(playStep, stepMs);
+    }
+
+    _kick(t, vol) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(125, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.11);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      o.connect(g); g.connect(this.bgmGain);
+      o.start(t); o.stop(t + 0.15);
+    }
+    _snare(t, vol) {
+      if (!this.noiseBuf) return;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(1600, t); f.Q.value = 1.2;
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      src.connect(f); f.connect(g); g.connect(this.bgmGain);
+      src.start(t); src.stop(t + 0.1);
+    }
+    _hihat(t, vol) {
+      if (!this.noiseBuf) return;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.setValueAtTime(7000, t);
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      src.connect(f); f.connect(g); g.connect(this.bgmGain);
+      src.start(t); src.stop(t + 0.05);
+    }
+    _organNote(t, freq, dur, vol, type) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g); g.connect(this.bgmGain); o.start(t); o.stop(t + dur + 0.02);
+    }
+    _leadNote(t, freq, dur, vol, type) {
+      const o = this.ctx.createOscillator(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      f.type = 'lowpass'; f.frequency.setValueAtTime(2200, t);
+      g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(vol, t + 0.018); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(f); f.connect(g); g.connect(this.bgmGain); o.start(t); o.stop(t + dur + 0.02);
+    }
+
+    playThrow() {
+      this.init();
+      if (!this.ctx || !this.noiseBuf) return;
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter(); f.type = 'bandpass';
+      f.frequency.setValueAtTime(420, t); f.frequency.exponentialRampToValueAtTime(1450, t + 0.09); f.frequency.exponentialRampToValueAtTime(520, t + 0.18); f.Q.value = 2.0;
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.28, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+      src.connect(f); f.connect(g); g.connect(this.sfxGain); src.start(t); src.stop(t + 0.2);
+    }
+
+    playPanelHit(isTarget = true, combo = 1) {
+      this.init();
+      if (!this.ctx || !this.noiseBuf) return;
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf;
+      const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(isTarget ? 1180 : 720, t); bp.Q.value = 2.6;
+      const ng = this.ctx.createGain(); ng.gain.setValueAtTime(0.65, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.085);
+      src.connect(bp); bp.connect(ng); ng.connect(this.sfxGain); src.start(t); src.stop(t + 0.09);
+
+      const body = this.ctx.createOscillator(), bg = this.ctx.createGain();
+      body.type = 'triangle'; body.frequency.setValueAtTime(isTarget ? 280 : 170, t); body.frequency.exponentialRampToValueAtTime(95, t + 0.09);
+      bg.gain.setValueAtTime(0.42, t); bg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      body.connect(bg); bg.connect(this.sfxGain); body.start(t); body.stop(t + 0.11);
+
+      if (isTarget) {
+        const pentatonic = [880, 987.77, 1046.5, 1174.66, 1318.5, 1567.98];
+        const chimeFreq = pentatonic[Math.min(pentatonic.length - 1, Math.max(0, combo - 1))];
+        const chime = this.ctx.createOscillator(), cg = this.ctx.createGain();
+        chime.type = 'sine'; chime.frequency.setValueAtTime(chimeFreq, t + 0.02);
+        cg.gain.setValueAtTime(0.14, t + 0.02); cg.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        chime.connect(cg); cg.connect(this.sfxGain); chime.start(t + 0.02); chime.stop(t + 0.29);
+      }
+    }
+
+    playExplosion() {
+      this.init();
+      if (!this.ctx || !this.noiseBuf) return;
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf;
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(110, t + 0.55);
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(0.85, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+      src.connect(lp); lp.connect(g); g.connect(this.sfxGain); src.start(t); src.stop(t + 0.62);
+
+      const sub = this.ctx.createOscillator(), sg = this.ctx.createGain();
+      sub.type = 'sine'; sub.frequency.setValueAtTime(130, t); sub.frequency.exponentialRampToValueAtTime(32, t + 0.48);
+      sg.gain.setValueAtTime(0.55, t); sg.gain.exponentialRampToValueAtTime(0.001, t + 0.52);
+      sub.connect(sg); sg.connect(this.sfxGain); sub.start(t); sub.stop(t + 0.54);
+    }
+
+    playFrameClang() {
+      this.init();
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      [540, 815, 1340].forEach((freq, idx) => {
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = idx === 0 ? 'square' : 'triangle'; o.frequency.setValueAtTime(freq, t);
+        g.gain.setValueAtTime(0.16 / (idx + 1), t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.24);
+      });
+    }
+
+    playNetMiss() {
+      this.init();
+      if (!this.ctx || !this.noiseBuf) return;
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuf;
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(650, t);
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      src.connect(lp); lp.connect(g); g.connect(this.sfxGain); src.start(t); src.stop(t + 0.18);
+    }
+
+    playFanfare(grand = false) {
+      this.init();
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      const notes = grand
+        ? [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5, 1318.5]
+        : [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((freq, i) => {
+        const start = t + i * (grand ? 0.11 : 0.09);
+        const dur = i === notes.length - 1 ? 0.65 : 0.16;
+        const o = this.ctx.createOscillator(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, start);
+        f.type = 'lowpass'; f.frequency.setValueAtTime(2800, start);
+        g.gain.setValueAtTime(0.001, start); g.gain.linearRampToValueAtTime(0.18, start + 0.02); g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        o.connect(f); f.connect(g); g.connect(this.sfxGain); o.start(start); o.stop(start + dur + 0.03);
+      });
+    }
+
+    playFail() {
+      this.init();
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      [293.66, 261.63, 220.0].forEach((freq, i) => {
+        const start = t + i * 0.14;
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = 'triangle'; o.frequency.setValueAtTime(freq, start);
+        g.gain.setValueAtTime(0.18, start); g.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+        o.connect(g); g.connect(this.sfxGain); o.start(start); o.stop(start + 0.27);
+      });
+    }
+  }
+
+  const audio = new SoundEngine();
+
+  // =========================================================================
+  // 3. GAME STATE & ENTITIES
+  // =========================================================================
+  const canvas = document.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+
+  const state = {
+    screen: 'home',
+    stageIndex: 0,
+    ballsLeft: 12,
+    ballsThrown: 0,
+    hitsCount: 0,
+    score: 0,
+    combo: 0,
+    maxCombo: 0,
+    boards: [],
+    targetNums: [],
+    // Special Stage Mechanics State
+    windX: 0, // px horizontal drift applied during ball flight
+    windStreaks: [],
+    movePhase: 0,
+    seqNext: 1, // For Stage 11 (1->9)
+    popupTimer: 0, // For Stage 12 (Whack-a-Panel)
+    popupActive: [], // Indices currently popped up
+    doubleIdx: 4, // Moving 2x cell for Stage 14 (Score Attack)
+    doubleTimer: 0,
+    blackoutTimer: 0, // Stage 15 flash cycle
+    bingoLines: [], // Completed lines for Stage 17
+    // OOXX & Bo3 Boss State
+    turn: 'player',
+    bossTimer: 0,
+    bossAim: null,
+    bossReticle: null,
+    winLine: null,
+    ooxxRound: 1,
+    bo3Player: 0,
+    bo3Boss: 0,
+    // Aiming & Physics
+    aiming: false,
+    aimX: 0,
+    aimY: 0,
+    aimHoldTime: 0,
+    focusQuality: 0,
+    swayPhase: 0,
+    activeBall: null,
+    reboundBalls: [],
+    particles: [],
+    fireworks: [],
+    shakeTime: 0,
+    shakeMag: 0,
+    hangingPlush: [
+      { xRatio: 0.16, color: '#f472b6', accent: '#fbcfe8', phase: 0.2 },
+      { xRatio: 0.31, color: '#60a5fa', accent: '#bfdbfe', phase: 1.4 },
+      { xRatio: 0.49, color: '#fbbf24', accent: '#fef3c7', phase: 2.5 },
+      { xRatio: 0.67, color: '#a78bfa', accent: '#ede9fe', phase: 3.7 },
+      { xRatio: 0.84, color: '#fb923c', accent: '#ffedd5', phase: 4.9 }
+    ]
+  };
+
+  // =========================================================================
+  // 4. RESPONSIVE LAYOUT & DYNAMIC BOARD POSITIONING
+  // =========================================================================
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.max(320, rect.width);
+    H = Math.max(480, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    layoutBoards();
+  }
+
+  function layoutBoards() {
+    const stage = STAGES[state.stageIndex];
+    const count = state.boards.length || stage.boards;
+    if (!state.boards.length) return;
+
+    const topSafe = Math.max(106, H * 0.15);
+    const bottomSafe = Math.max(156, H * 0.23);
+    const availH = Math.max(200, H - topSafe - bottomSafe);
+    const availW = W - 26;
+    const isPortrait = W < 540;
+    const isMoving = stage.mode === 'moving' || stage.mode === 'twin_chaos' || stage.mode === 'ooxx_boss';
+
+    if (count === 1) {
+      const maxRatio = isMoving ? 0.68 : 0.86;
+      const size = Math.min(availW * maxRatio, availH * 0.88, isMoving ? 300 : 370);
+      const bx = (W - size) / 2;
+      const by = topSafe + (availH - size) * 0.48;
+      state.boards[0].baseX = bx;
+      state.boards[0].baseY = by;
+      assignBoardRect(state.boards[0], bx, by, size, size);
+    } else if (count === 2) {
+      const gap = Math.max(12, Math.min(28, W * 0.03));
+      const size = Math.min((availW - gap) / 2, availH * (isMoving ? 0.72 : 0.84), isMoving ? 260 : 310);
+      const totalW = size * 2 + gap;
+      const startX = (W - totalW) / 2;
+      const by = topSafe + (availH - size) * 0.5;
+      state.boards[0].baseX = startX;
+      state.boards[0].baseY = by;
+      state.boards[1].baseX = startX + size + gap;
+      state.boards[1].baseY = by;
+      assignBoardRect(state.boards[0], startX, by, size, size);
+      assignBoardRect(state.boards[1], startX + size + gap, by, size, size);
+    } else if (count === 3) {
+      if (isPortrait) {
+        const gapX = 14, gapY = 22;
+        const size = Math.min((availW - gapX) / 2, (availH - gapY) / 2, 215);
+        const totalH = size * 2 + gapY;
+        const topY = topSafe + (availH - totalH) * 0.46;
+        const topW = size * 2 + gapX;
+        const leftX = (W - topW) / 2;
+        state.boards[0].baseX = leftX; state.boards[0].baseY = topY;
+        state.boards[1].baseX = leftX + size + gapX; state.boards[1].baseY = topY;
+        state.boards[2].baseX = (W - size) / 2; state.boards[2].baseY = topY + size + gapY;
+        assignBoardRect(state.boards[0], state.boards[0].baseX, state.boards[0].baseY, size, size);
+        assignBoardRect(state.boards[1], state.boards[1].baseX, state.boards[1].baseY, size, size);
+        assignBoardRect(state.boards[2], state.boards[2].baseX, state.boards[2].baseY, size, size);
+      } else {
+        const gap = Math.max(14, Math.min(26, W * 0.025));
+        const size = Math.min((availW - gap * 2) / 3, availH * 0.82, 290);
+        const totalW = size * 3 + gap * 2;
+        const startX = (W - totalW) / 2;
+        const by = topSafe + (availH - size) * 0.5;
+        for (let i = 0; i < 3; i++) {
+          state.boards[i].baseX = startX + i * (size + gap);
+          state.boards[i].baseY = by;
+          assignBoardRect(state.boards[i], state.boards[i].baseX, by, size, size);
+        }
+      }
+    }
+  }
+
+  function assignBoardRect(board, x, y, w, h) {
+    board.x = x;
+    board.y = y;
+    board.w = w;
+    board.h = h;
+    const pad = Math.max(6, w * 0.036);
+    const bar = Math.max(4, w * 0.022);
+    const cellW = (w - pad * 2 - bar * 2) / 3;
+    const cellH = (h - pad * 2 - bar * 2) / 3;
+    board.pad = pad;
+    board.bar = bar;
+    for (let i = 0; i < 9; i++) {
+      const r = Math.floor(i / 3);
+      const c = i % 3;
+      const p = board.panels[i];
+      p.x = x + pad + c * (cellW + bar);
+      p.y = y + pad + r * (cellH + bar);
+      p.w = cellW;
+      p.h = cellH;
+    }
+  }
+
+  // =========================================================================
+  // 5. STAGE INITIALIZATION & SPECIAL MECHANIC SETUP
+  // =========================================================================
+  function rollWind(maxVal) {
+    if (!maxVal) return 0;
+    const dir = Math.random() > 0.5 ? 1 : -1;
+    return dir * Math.round(maxVal * (0.58 + Math.random() * 0.42));
+  }
+
+  function pickPopupPanels() {
+    const pool = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    state.popupActive = [pool[0], pool[1]];
+  }
+
+  function initStage(idx, resetMatch = true) {
+    state.stageIndex = idx;
+    const stage = STAGES[idx];
+    state.ballsLeft = stage.balls;
+    state.ballsThrown = 0;
+    state.hitsCount = 0;
+    state.score = 0;
+    state.combo = 0;
+    state.maxCombo = 0;
+    state.activeBall = null;
+    state.reboundBalls = [];
+    state.particles = [];
+    state.aiming = false;
+    state.winLine = null;
+    state.turn = 'player';
+    state.bossTimer = 0;
+    state.bossAim = null;
+    state.bossReticle = null;
+    state.movePhase = 0;
+    state.seqNext = 1;
+    state.popupTimer = 1.55;
+    state.doubleIdx = 4;
+    state.doubleTimer = 2.6;
+    state.blackoutTimer = 0;
+    state.bingoLines = [];
+
+    if (resetMatch) {
+      state.ooxxRound = 1;
+      state.bo3Player = 0;
+      state.bo3Boss = 0;
+    }
+
+    // Wind initialization
+    state.windX = stage.windMax ? rollWind(stage.windMax) : 0;
+    state.windStreaks = [];
+    if (state.windX !== 0) {
+      for (let i = 0; i < 18; i++) {
+        state.windStreaks.push({
+          x: Math.random() * (W || 400),
+          y: 70 + Math.random() * ((H || 700) - 180),
+          len: 28 + Math.random() * 44,
+          spd: 140 + Math.random() * 140
+        });
+      }
+    }
+
+    // Sniper / Bomb / Bingo random picks
+    state.targetNums = [];
+    let bombSet = new Set();
+    let blockedIdx = -1;
+    if (stage.mode === 'sniper') {
+      const pool = [1,2,3,4,5,6,7,8,9];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      state.targetNums = pool.slice(0, stage.targets).sort((a, b) => a - b);
+    } else if (stage.mode === 'bomb') {
+      const pool = [0,1,2,3,4,5,6,7,8];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      bombSet = new Set([pool[0], pool[1], pool[2]]);
+    } else if (stage.mode === 'bingo') {
+      // Block 1 random non-center edge cell so double bingo stays richly solvable!
+      const edges = [1, 3, 5, 7];
+      blockedIdx = edges[Math.floor(Math.random() * edges.length)];
+    } else if (stage.mode === 'popup') {
+      pickPopupPanels();
+    }
+
+    state.boards = [];
+    const labels = ['A 座', 'B 座', 'C 座'];
+    for (let b = 0; b < stage.boards; b++) {
+      const panels = [];
+      for (let i = 0; i < 9; i++) {
+        const num = i + 1;
+        panels.push({
+          num,
+          hit: false,
+          flipAngle: 0,
+          flipVel: 0,
+          owner: null,
+          isTarget: stage.mode === 'sniper' ? state.targetNums.includes(num) : true,
+          isBomb: stage.mode === 'bomb' && bombSet.has(i),
+          isBlocked: stage.mode === 'bingo' && i === blockedIdx,
+          points: SCORE_VALUES[i],
+          hitFlash: 0,
+          wrongShake: 0
+        });
+      }
+      state.boards.push({
+        id: b,
+        label: stage.boards > 1 ? labels[b] : '',
+        baseX: 0, baseY: 0, x: 0, y: 0, w: 0, h: 0, pad: 8, bar: 5,
+        panels
+      });
+    }
+    layoutBoards();
+    updateHUD();
+  }
+
+  function updateHUD() {
+    const stage = STAGES[state.stageIndex];
+    document.getElementById('hud-stage').textContent = W < 420 ? stage.short : `${stage.name}・${stage.title}`;
+    const ballsEl = document.getElementById('hud-balls');
+    const ballsWrap = document.getElementById('hud-balls-wrap');
+    const progEl = document.getElementById('hud-progress');
+    const banner = document.getElementById('sub-banner');
+
+    ballsWrap.classList.remove('clutch');
+
+    if (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') {
+      ballsEl.textContent = stage.mode === 'ooxx_boss' ? `${state.bo3Player}:${state.bo3Boss}` : '∞';
+      progEl.textContent = state.turn === 'player' ? '你的回合 (O)' : '莊家回合 (X)';
+      banner.classList.add('visible');
+      const windTag = state.windX !== 0
+        ? `<span style="opacity:.45">|</span><span style="color:#7dd3fc">${state.windX > 0 ? '→' : '←'} 風 ${Math.abs(state.windX / 10).toFixed(1)}</span>`
+        : '';
+      const bo3Tag = stage.mode === 'ooxx_boss' ? `<span>搶 2 勝</span><span style="opacity:.45">|</span>` : '';
+      banner.innerHTML = state.turn === 'player'
+        ? `${bo3Tag}<span style="color:#fb923c">● 你 (O)</span>${windTag}`
+        : `${bo3Tag}<span style="color:#f87171">✕ 莊家瞄準中…</span>${windTag}`;
+    } else if (stage.mode === 'sniper') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      const rem = stage.targets - state.hitsCount;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft > 0 && state.ballsLeft <= rem);
+      progEl.textContent = `${state.hitsCount} / ${stage.targets}`;
+      banner.classList.add('visible');
+      const board = state.boards[0];
+      const chips = state.targetNums.map(n => {
+        const done = board && board.panels[n - 1].hit;
+        return `<span class="target-chip ${done ? 'done' : ''}">${n}</span>`;
+      }).join('');
+      banner.innerHTML = `<span>指定號碼</span>${chips}`;
+    } else if (stage.mode === 'wind' || stage.mode === 'twin_chaos') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      const rem = stage.targets - state.hitsCount;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft > 0 && state.ballsLeft <= rem + 1);
+      progEl.textContent = `${state.hitsCount} / ${stage.targets}`;
+      banner.classList.add('visible');
+      const arrow = state.windX > 0 ? '向右強風 ➔' : '⬅ 向左強風';
+      const spd = (Math.abs(state.windX) / 10).toFixed(1);
+      banner.innerHTML = `<span style="color:#7dd3fc">💨 ${arrow} ${spd} m/s</span><span style="opacity:.45">|</span><span>請逆風修正落點</span>`;
+    } else if (stage.mode === 'moving') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      progEl.textContent = `${state.hitsCount} / ${stage.targets}`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span style="color:#fcd34d">⇄ 電動滑軌移動中</span><span style="opacity:.45">|</span><span>抓準提前量投球</span>`;
+    } else if (stage.mode === 'sequence') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      const rem = stage.targets - state.hitsCount;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft > 0 && state.ballsLeft <= rem);
+      progEl.textContent = `${state.hitsCount} / 9`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span>下一目標</span><span class="target-chip">${Math.min(9, state.seqNext)}</span><span style="opacity:.7">依序 1 → 9 擊落</span>`;
+    } else if (stage.mode === 'popup') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      const rem = stage.targets - state.hitsCount;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft > 0 && state.ballsLeft <= rem);
+      progEl.textContent = `${state.hitsCount} / ${stage.targets}`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span style="color:#4ade80">⚡ 地鼠快閃</span><span style="opacity:.45">|</span><span>快手擊中亮燈面板！</span>`;
+    } else if (stage.mode === 'bomb') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      const rem = stage.targets - state.hitsCount;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft > 0 && state.ballsLeft <= rem);
+      progEl.textContent = `${state.hitsCount} / ${stage.targets}`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span style="color:#f87171">💣 避開 3 顆地雷</span><span style="opacity:.45">|</span><span>擊中全部 6 塊金板</span>`;
+    } else if (stage.mode === 'score') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft <= 2);
+      progEl.textContent = `${state.score} / ${stage.targets}`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span style="color:#fbbf24">★ 目標 ${stage.targets} 分</span><span style="opacity:.45">|</span><span>搶 2× 格＋連擊倍率</span>`;
+    } else if (stage.mode === 'blackout') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      progEl.textContent = `${state.hitsCount} / 9`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span style="color:#c084fc">⚡ 暗夜霓虹瞬閃</span><span style="opacity:.45">|</span><span>憑記憶精準投球</span>`;
+    } else if (stage.mode === 'bingo') {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft <= 2);
+      progEl.textContent = `${state.bingoLines.length} / 2 線`;
+      banner.classList.add('visible');
+      banner.innerHTML = `<span style="color:#38bdf8">✦ 雙賓果挑戰</span><span style="opacity:.45">|</span><span>7 球內完成 2 條連線</span>`;
+    } else {
+      ballsEl.textContent = `${state.ballsLeft} 球`;
+      const rem = stage.targets - state.hitsCount;
+      ballsWrap.classList.toggle('clutch', state.ballsLeft > 0 && state.ballsLeft <= rem + 1);
+      progEl.textContent = `${state.hitsCount} / ${stage.targets}`;
+      banner.classList.remove('visible');
+    }
+  }
+
+  let toastTimer = null;
+  function showToast(mainText, color = '#fbbf24', subText = '') {
+    const wrap = document.getElementById('toast');
+    document.getElementById('toast-main').textContent = mainText;
+    document.getElementById('toast-main').style.color = color;
+    document.getElementById('toast-sub').textContent = subText;
+    wrap.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => wrap.classList.remove('show'), 950);
+  }
+
+  // =========================================================================
+  // 6. PITCHING, WIND DRIFT, COLLISION & OOXX AI
+  // =========================================================================
+  function getSwayOffset() {
+    const stage = STAGES[state.stageIndex];
+    const focusFactor = 1 - state.focusQuality * 0.8;
+    const amp = 13.5 * stage.sway * focusFactor;
+    return {
+      dx: Math.sin(state.swayPhase * 2.1) * amp + Math.cos(state.swayPhase * 3.7) * (amp * 0.32),
+      dy: Math.cos(state.swayPhase * 1.7) * amp * 0.82
+    };
+  }
+
+  function launchPitch(tx, ty, owner = 'player', spreadPx = 6, quality = 0.8) {
+    const stage = STAGES[state.stageIndex];
+    const isDuel = stage.mode === 'ooxx' || stage.mode === 'ooxx_boss';
+    if (owner === 'player' && !isDuel) {
+      state.ballsLeft = Math.max(0, state.ballsLeft - 1);
+      state.ballsThrown++;
+    }
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * spreadPx;
+    // Apply crosswind drift (faster pitches experience slightly less drift!)
+    const windDrift = state.windX * (1.05 - quality * 0.15);
+    const finalX = tx + Math.cos(angle) * dist + (owner === 'player' ? windDrift : windDrift * 0.35);
+    const finalY = ty + Math.sin(angle) * dist;
+    const kmh = Math.round(126 + quality * 24 + (Math.random() - 0.5) * 4);
+
+    state.activeBall = {
+      startX: owner === 'player' ? W * 0.5 : W * 0.5 + (Math.random() - 0.5) * 90,
+      startY: owner === 'player' ? H - 64 : H - 40,
+      aimedX: tx,
+      targetX: finalX,
+      targetY: finalY,
+      t: 0,
+      dur: owner === 'player' ? (0.37 - quality * 0.05) : 0.42,
+      owner,
+      kmh,
+      spin: (Math.random() > 0.5 ? 1 : -1) * (12 + Math.random() * 6),
+      trail: []
+    };
+    audio.playThrow();
+    updateHUD();
+  }
+
+  function resolveImpact(ball) {
+    const stage = STAGES[state.stageIndex];
+    const bx = ball.targetX;
+    const by = ball.targetY;
+    let hitType = 'net';
+    let hitPanel = null;
+    let hitIdx = -1;
+
+    for (const board of state.boards) {
+      if (bx >= board.x && bx <= board.x + board.w && by >= board.y && by <= board.y + board.h) {
+        for (let i = 0; i < board.panels.length; i++) {
+          const p = board.panels[i];
+          if (bx >= p.x && bx <= p.x + p.w && by >= p.y && by <= p.y + p.h) {
+            hitPanel = p;
+            hitIdx = i;
+            break;
+          }
+        }
+        if (!hitPanel) hitType = 'frame';
+        break;
+      }
+    }
+
+    let bombTriggered = false;
+    let gainedPts = 0;
+
+    if (hitPanel) {
+      if (stage.mode === 'clear' || stage.mode === 'wind' || stage.mode === 'moving' || stage.mode === 'blackout' || stage.mode === 'twin_chaos') {
+        if (!hitPanel.hit) {
+          hitPanel.hit = true;
+          hitPanel.flipVel = 15;
+          hitPanel.hitFlash = 1;
+          state.hitsCount++;
+          state.combo++;
+          state.maxCombo = Math.max(state.maxCombo, state.combo);
+          hitType = 'panel';
+        } else {
+          state.combo = 0;
+          hitType = 'open';
+        }
+      } else if (stage.mode === 'sniper') {
+        if (hitPanel.isTarget && !hitPanel.hit) {
+          hitPanel.hit = true;
+          hitPanel.flipVel = 16;
+          hitPanel.hitFlash = 1;
+          state.hitsCount++;
+          state.combo++;
+          hitType = 'panel';
+        } else if (hitPanel.hit) {
+          state.combo = 0;
+          hitType = 'open';
+        } else {
+          state.combo = 0;
+          hitPanel.wrongShake = 1;
+          hitType = 'wrong_panel';
+        }
+      } else if (stage.mode === 'sequence') {
+        if (hitPanel.num === state.seqNext && !hitPanel.hit) {
+          hitPanel.hit = true;
+          hitPanel.flipVel = 16;
+          hitPanel.hitFlash = 1;
+          state.hitsCount++;
+          state.seqNext++;
+          state.combo++;
+          hitType = 'panel';
+        } else if (hitPanel.hit) {
+          state.combo = 0;
+          hitType = 'open';
+        } else {
+          state.combo = 0;
+          hitPanel.wrongShake = 1;
+          hitType = 'wrong_panel';
+        }
+      } else if (stage.mode === 'popup') {
+        if (state.popupActive.includes(hitIdx)) {
+          hitPanel.hitFlash = 1;
+          state.hitsCount++;
+          state.combo++;
+          state.popupActive = state.popupActive.filter(i => i !== hitIdx);
+          if (!state.popupActive.length) {
+            pickPopupPanels();
+            state.popupTimer = 1.55;
+          }
+          hitType = 'panel';
+        } else {
+          state.combo = 0;
+          hitType = 'open';
+        }
+      } else if (stage.mode === 'bomb') {
+        if (hitPanel.isBomb) {
+          hitPanel.hit = true;
+          hitPanel.hitFlash = 1;
+          bombTriggered = true;
+          hitType = 'bomb';
+        } else if (!hitPanel.hit) {
+          hitPanel.hit = true;
+          hitPanel.flipVel = 15.5;
+          hitPanel.hitFlash = 1;
+          state.hitsCount++;
+          state.combo++;
+          hitType = 'panel';
+        } else {
+          state.combo = 0;
+          hitType = 'open';
+        }
+      } else if (stage.mode === 'score') {
+        state.combo++;
+        const is2x = hitIdx === state.doubleIdx;
+        const comboMult = 1 + Math.min(state.combo - 1, 5) * 0.2;
+        gainedPts = Math.round(hitPanel.points * (is2x ? 2 : 1) * comboMult);
+        state.score += gainedPts;
+        hitPanel.hitFlash = 1;
+        hitType = 'panel';
+      } else if (stage.mode === 'bingo') {
+        if (hitPanel.isBlocked) {
+          state.combo = 0;
+          hitPanel.wrongShake = 1;
+          hitType = 'frame';
+        } else if (!hitPanel.hit) {
+          hitPanel.hit = true;
+          hitPanel.hitFlash = 1;
+          state.hitsCount++;
+          state.combo++;
+          hitType = 'panel';
+          // Recompute completed bingo lines
+          const panels = state.boards[0].panels;
+          state.bingoLines = WIN_LINES.filter(line => line.every(i => panels[i].hit));
+        } else {
+          state.combo = 0;
+          hitType = 'wrong_panel';
+        }
+      } else if (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') {
+        if (!hitPanel.owner) {
+          hitPanel.owner = ball.owner === 'player' ? 'O' : 'X';
+          hitPanel.hit = true;
+          hitPanel.hitFlash = 1;
+          hitType = 'panel';
+        } else {
+          hitPanel.wrongShake = 1;
+          hitType = 'wrong_panel';
+        }
+      }
+    } else {
+      if (ball.owner === 'player') state.combo = 0;
+    }
+
+    // Audio & Visual Juice
+    if (hitType === 'bomb') {
+      audio.playExplosion();
+      state.shakeTime = 0.35;
+      state.shakeMag = 12;
+      spawnSparks(bx, by, '#ef4444', 34);
+      spawnSparks(bx, by, '#fbbf24', 20);
+      showToast('💥 踩到地雷！', '#ef4444', '任務失敗');
+    } else if (hitType === 'panel') {
+      audio.playPanelHit(true, state.combo);
+      state.shakeTime = 0.14;
+      state.shakeMag = 5.5;
+      spawnSparks(bx, by, ball.owner === 'boss' ? '#f87171' : '#fbbf24', 20);
+      if (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') {
+        showToast(
+          ball.owner === 'player' ? `命中 ${hitPanel.num} 號 → O！` : `莊家命中 ${hitPanel.num} 號 → X`,
+          ball.owner === 'player' ? '#fbbf24' : '#f87171',
+          `${ball.kmh} km/h`
+        );
+      } else if (stage.mode === 'score') {
+        const sub = state.combo >= 2 ? `🔥 ${state.combo} 連擊加成！` : `${ball.kmh} km/h`;
+        showToast(`+${gainedPts} 分！`, '#fbbf24', sub);
+      } else if (stage.mode === 'bingo') {
+        const sub = state.bingoLines.length ? `✦ 已達成 ${state.bingoLines.length} 條賓果線！` : `${ball.kmh} km/h`;
+        showToast(`點亮 ${hitPanel.num} 號！`, '#38bdf8', sub);
+      } else {
+        const sub = state.combo >= 2 ? `${ball.kmh} km/h・🔥 ${state.combo} 連擊` : `${ball.kmh} km/h`;
+        showToast(`HIT! ${hitPanel.num} 號`, '#4ade80', sub);
+      }
+      spawnRebound(bx, by, 1.0);
+    } else if (hitType === 'wrong_panel') {
+      audio.playPanelHit(false);
+      state.shakeTime = 0.12;
+      state.shakeMag = 4;
+      spawnSparks(bx, by, '#f87171', 10);
+      const msg = stage.mode === 'sequence' ? `順序錯誤！請打 ${state.seqNext} 號`
+        : (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') ? '已被佔領！換手'
+        : stage.mode === 'bingo' ? '此格已點亮！' : '非指定號碼！';
+      showToast(msg, '#f87171', `${ball.kmh} km/h`);
+      spawnRebound(bx, by, 1.25);
+    } else if (hitType === 'frame') {
+      audio.playFrameClang();
+      state.shakeTime = 0.12;
+      state.shakeMag = 4.5;
+      spawnSparks(bx, by, '#e2e8f0', 12);
+      showToast(stage.mode === 'bingo' && hitPanel && hitPanel.isBlocked ? '打中鋼鐵封鎖格 🔒！' : '擦到鐵框！', '#cbd5e1', `${ball.kmh} km/h`);
+      spawnRebound(bx, by, 1.5);
+    } else if (hitType === 'open') {
+      audio.playNetMiss();
+      showToast(stage.mode === 'popup' ? '慢了一步！面板已縮回' : '穿過空洞！', '#94a3b8');
+      spawnRebound(bx, by, 0.35);
+    } else {
+      audio.playNetMiss();
+      showToast('偏了！打中護網', '#94a3b8');
+      spawnRebound(bx, by, 0.35);
+    }
+
+    // Slightly shift gust wind after each pitch on wind stages for extra spice
+    if (stage.windMax && !bombTriggered) {
+      state.windX = rollWind(stage.windMax);
+    }
+
+    updateHUD();
+    checkStageOutcome(ball.owner, bombTriggered);
+  }
+
+  function checkStageOutcome(lastOwner, bombTriggered = false) {
+    const stage = STAGES[state.stageIndex];
+    if (bombTriggered) {
+      setTimeout(() => showStageFailModal('砸中紅色地雷 💣 任務中斷！穩住準心避開危險格再試一次。'), 680);
+      return;
+    }
+
+    if (stage.mode === 'score') {
+      if (state.score >= stage.targets) {
+        audio.playFanfare(false);
+        setTimeout(() => showStageClearModal(), 560);
+        return;
+      }
+      if (state.ballsLeft <= 0) {
+        audio.playFail();
+        setTimeout(() => showStageFailModal(`最終得分 ${state.score} 分，距離目標 ${stage.targets} 分還差 ${stage.targets - state.score} 分！`), 580);
+      }
+      return;
+    }
+
+    if (stage.mode === 'bingo') {
+      if (state.bingoLines.length >= stage.targets) {
+        audio.playFanfare(false);
+        setTimeout(() => showStageClearModal(), 620);
+        return;
+      }
+      if (state.ballsLeft <= 0) {
+        audio.playFail();
+        setTimeout(() => showStageFailModal(`7 顆球已用完，目前完成 ${state.bingoLines.length} / 2 條賓果連線！`), 580);
+      }
+      return;
+    }
+
+    if (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') {
+      const panels = state.boards[0].panels;
+      for (const line of WIN_LINES) {
+        const [a, b, c] = line;
+        if (panels[a].owner && panels[a].owner === panels[b].owner && panels[a].owner === panels[c].owner) {
+          state.winLine = { indices: line, winner: panels[a].owner };
+          const playerWonRound = panels[a].owner === 'O';
+          if (stage.mode === 'ooxx') {
+            if (playerWonRound) {
+              audio.playFanfare(true);
+              spawnVictoryFireworks();
+              setTimeout(() => showStageClearModal(true), 880);
+            } else {
+              audio.playFail();
+              setTimeout(() => showOOXXLossModal(), 860);
+            }
+          } else {
+            // Stage 18: Best-of-3 Grandmaster Boss
+            if (playerWonRound) state.bo3Player++;
+            else state.bo3Boss++;
+            updateHUD();
+
+            if (state.bo3Player >= 2) {
+              audio.playFanfare(true);
+              spawnVictoryFireworks();
+              setTimeout(() => showGrandVictoryModal(), 950);
+            } else if (state.bo3Boss >= 2) {
+              audio.playFail();
+              setTimeout(() => showOOXXLossModal(), 880);
+            } else {
+              audio.playFanfare(false);
+              showToast(playerWonRound ? `搶下 1 勝！(${state.bo3Player}:${state.bo3Boss})` : `大魔王扳回 1 局 (${state.bo3Player}:${state.bo3Boss})`, playerWonRound ? '#4ade80' : '#f87171', '準備進入下一局');
+              setTimeout(() => {
+                state.ooxxRound++;
+                initStage(state.stageIndex, false);
+              }, 1350);
+            }
+          }
+          return;
+        }
+      }
+      if (panels.every(p => p.owner !== null)) {
+        showToast('平手！延長驟死賽', '#fde68a', '清空九宮格再戰');
+        setTimeout(() => {
+          state.ooxxRound++;
+          initStage(state.stageIndex, false);
+        }, 1150);
+        return;
+      }
+      state.turn = lastOwner === 'player' ? 'boss' : 'player';
+      updateHUD();
+      if (state.turn === 'boss') {
+        state.bossTimer = 0.88;
+        state.bossAim = chooseBossCell();
+        const cell = state.boards[0].panels[state.bossAim];
+        state.bossReticle = {
+          x: W * 0.5,
+          y: state.boards[0].y + state.boards[0].h * 0.5,
+          targetX: cell.x + cell.w * 0.5,
+          targetY: cell.y + cell.h * 0.5
+        };
+      }
+      return;
+    }
+
+    // Standard clear / sniper / wind / moving / sequence / popup / bomb / blackout / twin_chaos
+    if (state.hitsCount >= stage.targets) {
+      audio.playFanfare(false);
+      setTimeout(() => showStageClearModal(), 540);
+      return;
+    }
+    const remTargets = stage.targets - state.hitsCount;
+    if (state.ballsLeft <= 0 || state.ballsLeft < remTargets) {
+      audio.playFail();
+      const reason = state.ballsLeft === 0
+        ? '球數已用完，差一點就全數制霸！'
+        : `剩餘 ${state.ballsLeft} 顆球不足以擊中剩下 ${remTargets} 個目標。`;
+      setTimeout(() => showStageFailModal(reason), 580);
+    }
+  }
+
+  function chooseBossCell() {
+    const panels = state.boards[0].panels;
+    const empty = [];
+    for (let i = 0; i < 9; i++) if (!panels[i].owner) empty.push(i);
+    if (!empty.length) return 4;
+    for (const idx of empty) if (wouldWin(panels, idx, 'X')) return idx;
+    for (const idx of empty) if (wouldWin(panels, idx, 'O')) return idx;
+    if (!panels[4].owner && Math.random() < 0.84) return 4;
+    const corners = [0, 2, 6, 8].filter(i => !panels[i].owner);
+    if (corners.length && Math.random() < 0.8) return corners[Math.floor(Math.random() * corners.length)];
+    return empty[Math.floor(Math.random() * empty.length)];
+  }
+
+  function wouldWin(panels, idx, mark) {
+    for (const [a, b, c] of WIN_LINES) {
+      const vals = [a, b, c].map(i => (i === idx ? mark : panels[i].owner));
+      if (vals[0] === mark && vals[1] === mark && vals[2] === mark) return true;
+    }
+    return false;
+  }
+
+  function spawnSparks(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 70 + Math.random() * 210;
+      state.particles.push({
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 45,
+        life: 0.42 + Math.random() * 0.28,
+        maxLife: 0.7,
+        size: 2.5 + Math.random() * 3.5,
+        color
+      });
+    }
+  }
+
+  function spawnRebound(x, y, power) {
+    state.reboundBalls.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 180 * power,
+      vy: (-110 - Math.random() * 90) * power,
+      r: 13,
+      life: 1.0
+    });
+  }
+
+  function spawnVictoryFireworks() {
+    state.fireworks = [];
+    for (let i = 0; i < 8; i++) {
+      setTimeout(() => {
+        if (state.screen !== 'victory' && state.screen !== 'modal' && !state.winLine) return;
+        const fx = W * (0.15 + Math.random() * 0.7);
+        const fy = H * (0.14 + Math.random() * 0.38);
+        const colors = ['#fbbf24', '#fb923c', '#4ade80', '#60a5fa', '#f472b6', '#ffffff'];
+        const col = colors[i % colors.length];
+        for (let k = 0; k < 28; k++) {
+          const ang = (k / 28) * Math.PI * 2 + Math.random() * 0.15;
+          const spd = 80 + Math.random() * 185;
+          state.fireworks.push({
+            x: fx, y: fy,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            life: 1.1 + Math.random() * 0.4,
+            maxLife: 1.5,
+            color: col,
+            size: 2.5 + Math.random() * 2.5
+          });
+        }
+      }, i * 310);
+    }
+  }
+
+  // =========================================================================
+  // 7. MODALS & FLOW CONTROLS
+  // =========================================================================
+  const resultModal = document.getElementById('result-modal');
+  const rulesModal = document.getElementById('rules-modal');
+  const homeScreen = document.getElementById('home-screen');
+  const hudEl = document.getElementById('hud');
+
+  function showStageClearModal(isStage8Medal = false) {
+    state.screen = 'modal';
+    const stage = STAGES[state.stageIndex];
+    const nextStage = STAGES[state.stageIndex + 1];
+    const iconEl = document.getElementById('res-icon');
+    iconEl.className = isStage8Medal ? 'medal-glow' : 'modal-badge';
+    iconEl.textContent = isStage8Medal ? '🏅' : (stage.id === 3 ? '🔥' : (stage.id === 17 ? '👑' : '🎯'));
+
+    document.getElementById('res-title').textContent = isStage8Medal
+      ? '贏得 🏅 金牌！解鎖延伸賽'
+      : `${stage.name} 制霸成功！`;
+
+    document.getElementById('res-sub').textContent = nextStage
+      ? `下一關：${nextStage.name}「${nextStage.title}」— ${nextStage.desc}`
+      : '恭喜全數通關！';
+
+    if (isStage8Medal) {
+      document.getElementById('res-stats').innerHTML = `
+        <div class="stat-box"><div class="stat-label">已獲榮譽</div><div class="stat-val">🏅 晉級金牌</div></div>
+        <div class="stat-box"><div class="stat-label">進度</div><div class="stat-val">8 / 18 關</div></div>
+      `;
+    } else if (stage.mode === 'score') {
+      document.getElementById('res-stats').innerHTML = `
+        <div class="stat-box"><div class="stat-label">本關得分</div><div class="stat-val">${state.score} 分</div></div>
+        <div class="stat-box"><div class="stat-label">最高連擊</div><div class="stat-val">${state.maxCombo} 連擊</div></div>
+      `;
+    } else {
+      const acc = state.ballsThrown > 0 ? Math.min(100, Math.round((state.hitsCount / state.ballsThrown) * 100)) : 100;
+      document.getElementById('res-stats').innerHTML = `
+        <div class="stat-box"><div class="stat-label">剩餘球數</div><div class="stat-val">${state.ballsLeft} 球</div></div>
+        <div class="stat-box"><div class="stat-label">本關命中率</div><div class="stat-val">${acc}%</div></div>
+      `;
+    }
+
+    document.getElementById('res-actions').innerHTML = `
+      <button id="btn-next-stage" class="btn-primary">進入下一關</button>
+    `;
+    document.getElementById('btn-next-stage').addEventListener('click', () => {
+      resultModal.classList.remove('open');
+      state.screen = 'playing';
+      initStage(state.stageIndex + 1, true);
+    });
+    resultModal.classList.add('open');
+  }
+
+  function showStageFailModal(reason) {
+    state.screen = 'modal';
+    const stage = STAGES[state.stageIndex];
+    document.getElementById('res-icon').className = 'modal-badge';
+    document.getElementById('res-icon').textContent = stage.mode === 'bomb' ? '💥' : '⚾';
+    document.getElementById('res-title').textContent = `${stage.name} 挑戰失敗`;
+    document.getElementById('res-sub').textContent = reason;
+    const progressText = stage.mode === 'score' ? `${state.score} / ${stage.targets}`
+      : stage.mode === 'bingo' ? `${state.bingoLines.length} / 2 線`
+      : `${state.hitsCount} / ${stage.targets}`;
+    document.getElementById('res-stats').innerHTML = `
+      <div class="stat-box"><div class="stat-label">本關進度</div><div class="stat-val">${progressText}</div></div>
+      <div class="stat-box"><div class="stat-label">剩餘球數</div><div class="stat-val">${state.ballsLeft} 球</div></div>
+    `;
+    document.getElementById('res-actions').innerHTML = `
+      <button id="btn-retry-stage" class="btn-primary">重新挑戰本關</button>
+      <button id="btn-back-home" class="btn-secondary">返回首頁</button>
+    `;
+    document.getElementById('btn-retry-stage').addEventListener('click', () => {
+      resultModal.classList.remove('open');
+      state.screen = 'playing';
+      initStage(state.stageIndex, true);
+    });
+    document.getElementById('btn-back-home').addEventListener('click', returnHome);
+    resultModal.classList.add('open');
+  }
+
+  function showOOXXLossModal() {
+    state.screen = 'modal';
+    const isBoss = STAGES[state.stageIndex].mode === 'ooxx_boss';
+    document.getElementById('res-icon').className = 'modal-badge';
+    document.getElementById('res-icon').textContent = '😤';
+    document.getElementById('res-title').textContent = isBoss ? '傳奇大魔王守住王座！' : '設計師莊家搶先連線！';
+    document.getElementById('res-sub').textContent = isBoss
+      ? `總比數 ${state.bo3Player} : ${state.bo3Boss}，穩住風偏與移動節奏再戰三戰兩勝！`
+      : '金牌還在莊家手上，穩住呼吸再投一場把 🏅 搶回來！';
+    document.getElementById('res-stats').innerHTML = `
+      <div class="stat-box"><div class="stat-label">對決回合</div><div class="stat-val">第 ${state.ooxxRound} 局</div></div>
+      <div class="stat-box"><div class="stat-label">戰果</div><div class="stat-val" style="color:#f87171">莊家勝</div></div>
+    `;
+    document.getElementById('res-actions').innerHTML = `
+      <button id="btn-rematch" class="btn-primary">再戰本關對決</button>
+      <button id="btn-back-home" class="btn-secondary">返回首頁</button>
+    `;
+    document.getElementById('btn-rematch').addEventListener('click', () => {
+      resultModal.classList.remove('open');
+      state.screen = 'playing';
+      initStage(state.stageIndex, true);
+    });
+    document.getElementById('btn-back-home').addEventListener('click', returnHome);
+    resultModal.classList.add('open');
+  }
+
+  function showGrandVictoryModal() {
+    state.screen = 'victory';
+    document.getElementById('res-icon').className = 'medal-glow';
+    document.getElementById('res-icon').textContent = '🏆';
+    document.getElementById('res-title').textContent = '恭喜破關！18 關傳奇大滿貫';
+    document.getElementById('res-sub').textContent = '從三座九宮格、六連狙擊、強風、滑軌、避雷、暗夜、雙賓果到動態 OOXX 大魔王全數制霸！你正式帶走 🏆 傳奇獎盃與 🏅 雙冠金牌！';
+    document.getElementById('res-stats').innerHTML = `
+      <div class="stat-box"><div class="stat-label">通關進度</div><div class="stat-val">18 / 18 關</div></div>
+      <div class="stat-box"><div class="stat-label">最高榮譽</div><div class="stat-val">🏆 🏅 傳奇王</div></div>
+    `;
+    document.getElementById('res-actions').innerHTML = `
+      <button id="btn-play-again" class="btn-primary">再次挑戰 18 關全制霸</button>
+      <button id="btn-back-home" class="btn-secondary">返回首頁</button>
+    `;
+    document.getElementById('btn-play-again').addEventListener('click', () => {
+      resultModal.classList.remove('open');
+      state.screen = 'playing';
+      initStage(0, true);
+    });
+    document.getElementById('btn-back-home').addEventListener('click', returnHome);
+    resultModal.classList.add('open');
+  }
+
+  function returnHome() {
+    resultModal.classList.remove('open');
+    state.screen = 'home';
+    hudEl.classList.remove('visible');
+    document.getElementById('sub-banner').classList.remove('visible');
+    document.getElementById('home-audio-btn').style.display = 'inline-flex';
+    homeScreen.classList.remove('hidden');
+    initStage(0, true);
+  }
+
+  // =========================================================================
+  // 8. INPUT HANDLING
+  // =========================================================================
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touchOffset = e.pointerType === 'touch' ? 52 : 0;
+    return {
+      x: Math.max(12, Math.min(W - 12, e.clientX - rect.left)),
+      y: Math.max(70, Math.min(H - 90, e.clientY - rect.top - touchOffset))
+    };
+  }
+
+  function canPlayerPitch() {
+    if (state.screen !== 'playing') return false;
+    if (state.activeBall) return false;
+    const stage = STAGES[state.stageIndex];
+    const isDuel = stage.mode === 'ooxx' || stage.mode === 'ooxx_boss';
+    if (isDuel && state.turn !== 'player') return false;
+    if (!isDuel && state.ballsLeft <= 0) return false;
+    return true;
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!canPlayerPitch()) return;
+    audio.startBGM();
+    const pos = getCanvasPos(e);
+    state.aiming = true;
+    state.aimX = pos.x;
+    state.aimY = pos.y;
+    state.aimHoldTime = 0;
+    state.focusQuality = 0;
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!state.aiming) return;
+    const pos = getCanvasPos(e);
+    state.aimX = pos.x;
+    state.aimY = pos.y;
+  });
+
+  function releasePitch() {
+    if (!state.aiming) return;
+    state.aiming = false;
+    if (!canPlayerPitch()) return;
+    const sway = getSwayOffset();
+    const spread = 11.5 - state.focusQuality * 9.5;
+    launchPitch(state.aimX + sway.dx, state.aimY + sway.dy, 'player', spread, state.focusQuality);
+  }
+
+  canvas.addEventListener('pointerup', releasePitch);
+  canvas.addEventListener('pointercancel', () => { state.aiming = false; });
+
+  document.getElementById('btn-start').addEventListener('click', () => {
+    audio.startBGM();
+    homeScreen.classList.add('hidden');
+    document.getElementById('home-audio-btn').style.display = 'none';
+    hudEl.classList.add('visible');
+    state.screen = 'playing';
+    initStage(0, true);
+  });
+  document.getElementById('btn-rules').addEventListener('click', () => { audio.init(); rulesModal.classList.add('open'); });
+  document.getElementById('hud-rules-btn').addEventListener('click', () => { rulesModal.classList.add('open'); });
+  document.getElementById('btn-close-rules').addEventListener('click', () => { rulesModal.classList.remove('open'); });
+  document.getElementById('home-audio-btn').addEventListener('click', () => { audio.init(); audio.toggleMute(); });
+  document.getElementById('hud-audio-btn').addEventListener('click', () => { audio.init(); audio.toggleMute(); });
+
+  // =========================================================================
+  // 9. UPDATE LOOP
+  // =========================================================================
+  let lastTime = 0;
+  function update(dt) {
+    const stage = STAGES[state.stageIndex];
+    state.swayPhase += dt;
+    if (state.shakeTime > 0) state.shakeTime = Math.max(0, state.shakeTime - dt);
+
+    // Dynamic Moving Boards (Stages 10, 16, 18)
+    if (state.screen === 'playing' && stage.moveSpeed && state.boards.length) {
+      state.movePhase += dt * stage.moveSpeed;
+      if (stage.mode === 'moving' || stage.mode === 'ooxx_boss') {
+        const b = state.boards[0];
+        const amp = Math.min(68, Math.max(24, (W - b.w) * 0.38));
+        const nx = b.baseX + Math.sin(state.movePhase) * amp;
+        assignBoardRect(b, nx, b.baseY, b.w, b.h);
+      } else if (stage.mode === 'twin_chaos' && state.boards.length === 2) {
+        const b0 = state.boards[0], b1 = state.boards[1];
+        const ampY = Math.min(34, H * 0.045);
+        const ampX = Math.min(18, W * 0.03);
+        assignBoardRect(b0, b0.baseX, b0.baseY + Math.sin(state.movePhase) * ampY, b0.w, b0.h);
+        assignBoardRect(b1, b1.baseX + Math.cos(state.movePhase * 1.15) * ampX, b1.baseY - Math.sin(state.movePhase) * ampY * 0.7, b1.w, b1.h);
+      }
+    }
+
+    // Wind streaks animation
+    if (state.windX !== 0) {
+      const dir = state.windX > 0 ? 1 : -1;
+      for (const s of state.windStreaks) {
+        s.x += dir * s.spd * (Math.abs(state.windX) / 28) * dt;
+        if (dir > 0 && s.x > W + 50) { s.x = -50; s.y = 70 + Math.random() * (H - 180); }
+        if (dir < 0 && s.x < -50) { s.x = W + 50; s.y = 70 + Math.random() * (H - 180); }
+      }
+    }
+
+    // Popup whack-a-panel timer (Stage 12)
+    if (state.screen === 'playing' && stage.mode === 'popup') {
+      state.popupTimer -= dt;
+      if (state.popupTimer <= 0) {
+        pickPopupPanels();
+        state.popupTimer = 1.55;
+      }
+    }
+
+    // Score Attack moving 2x tile (Stage 14)
+    if (state.screen === 'playing' && stage.mode === 'score') {
+      state.doubleTimer -= dt;
+      if (state.doubleTimer <= 0) {
+        state.doubleIdx = Math.floor(Math.random() * 9);
+        state.doubleTimer = 2.4;
+      }
+    }
+
+    // Blackout neon flash cycle (Stage 15)
+    if (state.screen === 'playing' && stage.mode === 'blackout') {
+      state.blackoutTimer = (state.blackoutTimer + dt) % 2.25;
+    }
+
+    // Focus ring sweet spot curve
+    if (state.aiming) {
+      state.aimHoldTime += dt;
+      if (state.aimHoldTime < 0.52) state.focusQuality = state.aimHoldTime / 0.52;
+      else if (state.aimHoldTime < 1.08) state.focusQuality = 1.0;
+      else state.focusQuality = Math.max(0.5, 1.0 - (state.aimHoldTime - 1.08) * 0.35);
+    }
+
+    // Panel flip physics
+    const isFlipMode = !['ooxx', 'ooxx_boss', 'popup', 'score', 'bingo'].includes(stage.mode);
+    for (const board of state.boards) {
+      for (const p of board.panels) {
+        if (p.hit && isFlipMode) {
+          if (p.flipAngle < Math.PI * 0.52) {
+            p.flipAngle += p.flipVel * dt;
+            p.flipVel *= Math.pow(0.88, dt * 60);
+            if (p.flipAngle >= Math.PI * 0.52) { p.flipAngle = Math.PI * 0.52; p.flipVel = 0; }
+          }
+        }
+        if (p.hitFlash > 0) p.hitFlash = Math.max(0, p.hitFlash - dt * 3.5);
+        if (p.wrongShake > 0) p.wrongShake = Math.max(0, p.wrongShake - dt * 4.5);
+      }
+    }
+
+    // Active flying baseball
+    if (state.activeBall) {
+      const b = state.activeBall;
+      b.t += dt / b.dur;
+      const cur = getBallPos(b, Math.min(1, b.t));
+      b.trail.push({ x: cur.x, y: cur.y, r: cur.r });
+      if (b.trail.length > 9) b.trail.shift();
+
+      if (b.t >= 1) {
+        const finished = state.activeBall;
+        state.activeBall = null;
+        resolveImpact(finished);
+      }
+    }
+
+    // OOXX Boss Turn AI Pitch
+    if (state.screen === 'playing' && (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') && state.turn === 'boss' && !state.activeBall && !state.winLine) {
+      state.bossTimer -= dt;
+      const cell = state.boards[0].panels[state.bossAim !== null ? state.bossAim : 4];
+      const cx = cell.x + cell.w * 0.5;
+      const cy = cell.y + cell.h * 0.5;
+      if (state.bossReticle) {
+        state.bossReticle.targetX = cx;
+        state.bossReticle.targetY = cy;
+        state.bossReticle.x += (cx - state.bossReticle.x) * Math.min(1, dt * 8);
+        state.bossReticle.y += (cy - state.bossReticle.y) * Math.min(1, dt * 8);
+      }
+      if (state.bossTimer <= 0) {
+        const missRoll = Math.random();
+        const accuracy = stage.mode === 'ooxx_boss' ? 0.90 : 0.86;
+        const spread = missRoll < accuracy ? cell.w * 0.22 : cell.w * 0.72;
+        state.bossReticle = null;
+        launchPitch(cx, cy, 'boss', spread, 0.88);
+      }
+    }
+
+    for (let i = state.reboundBalls.length - 1; i >= 0; i--) {
+      const rb = state.reboundBalls[i];
+      rb.x += rb.vx * dt; rb.y += rb.vy * dt; rb.vy += 680 * dt; rb.life -= dt * 1.1;
+      if (rb.life <= 0 || rb.y > H + 40) state.reboundBalls.splice(i, 1);
+    }
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const pt = state.particles[i];
+      pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vy += 320 * dt; pt.life -= dt;
+      if (pt.life <= 0) state.particles.splice(i, 1);
+    }
+    for (let i = state.fireworks.length - 1; i >= 0; i--) {
+      const fw = state.fireworks[i];
+      fw.x += fw.vx * dt; fw.y += fw.vy * dt; fw.vy += 120 * dt; fw.vx *= Math.pow(0.97, dt * 60); fw.life -= dt;
+      if (fw.life <= 0) state.fireworks.splice(i, 1);
+    }
+  }
+
+  function getBallPos(b, u) {
+    const ease = 1 - Math.pow(1 - u, 1.35);
+    // Realistic curved wind bend in X (quadratic ease-in as ball travels downrange)
+    const straightX = b.startX + (b.aimedX - b.startX) * ease;
+    const x = straightX + (b.targetX - b.aimedX) * (u * u);
+    const arcHeight = Math.min(110, H * 0.14);
+    const y = b.startY + (b.targetY - b.startY) * ease - Math.sin(u * Math.PI) * arcHeight;
+    const r = 28 * (1 - u * 0.56);
+    return { x, y, r };
+  }
+
+  // =========================================================================
+  // 10. RENDERING
+  // =========================================================================
+  function render() {
+    ctx.save();
+    if (state.shakeTime > 0) {
+      ctx.translate((Math.random() - 0.5) * state.shakeMag * 2, (Math.random() - 0.5) * state.shakeMag * 2);
+    }
+
+    drawCarnivalBackdrop();
+    drawDiamondMeshBack();
+    drawWindStreaks();
+    drawHangingPlushPrizes();
+    drawBoards();
+    drawBingoLines();
+    drawWinLineIfAny();
+    drawReboundBalls();
+    drawWoodenBallRack();
+    drawActiveBall();
+    drawBossReticle();
+    drawAimReticle();
+    drawParticles();
+
+    ctx.restore();
+  }
+
+  function drawCarnivalBackdrop() {
+    const stage = STAGES[state.stageIndex];
+    const isNight = stage.mode === 'blackout' && state.screen === 'playing';
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    if (isNight) {
+      sky.addColorStop(0, '#070911');
+      sky.addColorStop(0.55, '#0e1324');
+      sky.addColorStop(1, '#090b12');
+    } else {
+      sky.addColorStop(0, '#1e2532');
+      sky.addColorStop(0.28, '#2b3342');
+      sky.addColorStop(0.65, '#3b342c');
+      sky.addColorStop(1, '#1a1816');
+    }
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    if (!isNight) {
+      const bokeh = [
+        { x: W * 0.22, y: H * 0.34, r: 95, c: 'rgba(251, 191, 36, 0.13)' },
+        { x: W * 0.78, y: H * 0.30, r: 120, c: 'rgba(59, 130, 246, 0.15)' },
+        { x: W * 0.52, y: H * 0.24, r: 110, c: 'rgba(255, 255, 255, 0.08)' },
+        { x: W * 0.86, y: H * 0.52, r: 85, c: 'rgba(239, 68, 68, 0.11)' }
+      ];
+      for (const bk of bokeh) {
+        const g = ctx.createRadialGradient(bk.x, bk.y, 4, bk.x, bk.y, bk.r);
+        g.addColorStop(0, bk.c); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bk.x, bk.y, bk.r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    const canopy = ctx.createLinearGradient(0, 0, 0, 74);
+    canopy.addColorStop(0, 'rgba(10, 12, 18, 0.94)');
+    canopy.addColorStop(1, 'rgba(18, 22, 30, 0.0)');
+    ctx.fillStyle = canopy; ctx.fillRect(0, 0, W, 74);
+
+    const floorY = H * 0.72;
+    const floor = ctx.createLinearGradient(0, floorY, 0, H);
+    floor.addColorStop(0, 'rgba(24, 22, 20, 0.1)');
+    floor.addColorStop(0.5, 'rgba(20, 18, 16, 0.78)');
+    floor.addColorStop(1, '#12100e');
+    ctx.fillStyle = floor; ctx.fillRect(0, floorY, W, H - floorY);
+  }
+
+  function drawDiamondMeshBack() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(12, 14, 18, 0.42)';
+    ctx.lineWidth = 1.4;
+    const step = 28;
+    ctx.beginPath();
+    for (let x = -H; x < W + H; x += step) {
+      ctx.moveTo(x, 0); ctx.lineTo(x + H * 0.78, H);
+      ctx.moveTo(x, 0); ctx.lineTo(x - H * 0.78, H);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawWindStreaks() {
+    if (state.windX === 0 || state.screen !== 'playing') return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(125, 211, 252, 0.28)';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    const dir = state.windX > 0 ? 1 : -1;
+    for (const s of state.windStreaks) {
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x + dir * s.len, s.y - 3);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawHangingPlushPrizes() {
+    const yBase = Math.max(58, H * 0.085);
+    const windLean = state.windX * 0.25;
+    for (const p of state.hangingPlush) {
+      const px = W * p.xRatio;
+      const sway = Math.sin(state.swayPhase * 1.4 + p.phase) * 4 + windLean;
+      ctx.save();
+      ctx.translate(px + sway, yBase);
+      ctx.rotate(sway * 0.015);
+      ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(0, -yBase); ctx.lineTo(0, 0); ctx.stroke();
+
+      ctx.globalAlpha = 0.72;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(-8, -2, 5, 0, Math.PI * 2); ctx.arc(8, -2, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 6, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 21, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = p.accent;
+      ctx.beginPath(); ctx.ellipse(0, 21, 5, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawBoards() {
+    const stage = STAGES[state.stageIndex];
+    let hoveredPanel = null;
+    if (state.aiming) {
+      const sway = getSwayOffset();
+      const ax = state.aimX + sway.dx;
+      const ay = state.aimY + sway.dy;
+      for (const b of state.boards) {
+        for (const p of b.panels) {
+          if (ax >= p.x && ax <= p.x + p.w && ay >= p.y && ay <= p.y + p.h) { hoveredPanel = p; break; }
+        }
+      }
+    }
+
+    for (const board of state.boards) {
+      const { x, y, w, h } = board;
+      ctx.save();
+
+      // Sliding steel rail track for moving stages
+      if (stage.moveSpeed && state.screen === 'playing') {
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(20, y + h + 16);
+        ctx.lineTo(W - 20, y + h + 16);
+        ctx.stroke();
+      }
+
+      if (board.label) {
+        const bw = 48, bh = 18;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        roundRect(ctx, x + (w - bw) / 2, y - bh - 3, bw, bh, 6);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#fde68a';
+        ctx.font = '800 10.5px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(board.label, x + w / 2, y - bh / 2 - 2.5);
+      }
+
+      ctx.strokeStyle = '#1f242d';
+      ctx.lineWidth = Math.max(5, w * 0.025);
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.14, y + h); ctx.lineTo(x + w * 0.1, y + h + 58);
+      ctx.moveTo(x + w * 0.86, y + h); ctx.lineTo(x + w * 0.9, y + h + 58);
+      ctx.stroke();
+
+      ctx.shadowColor = 'rgba(0,0,0,0.58)';
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetY = 12;
+
+      const frameGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+      frameGrad.addColorStop(0, '#272c36');
+      frameGrad.addColorStop(0.5, '#151921');
+      frameGrad.addColorStop(1, '#0d1016');
+      ctx.fillStyle = frameGrad;
+      roundRect(ctx, x, y, w, h, 10);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      ctx.strokeStyle = (stage.mode === 'ooxx' || stage.mode === 'ooxx_boss')
+        ? 'rgba(251, 191, 36, 0.6)'
+        : stage.mode === 'blackout'
+        ? 'rgba(192, 132, 252, 0.55)'
+        : 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1.6;
+      roundRect(ctx, x, y, w, h, 10);
+      ctx.stroke();
+
+      for (let i = 0; i < board.panels.length; i++) {
+        drawPanel(board.panels[i], i, stage, board.panels[i] === hoveredPanel);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawPanel(p, idx, stage, isHovered) {
+    const { x, y, w, h } = p;
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(10, 14, 22, 0.72)';
+    roundRect(ctx, x, y, w, h, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + w, y + h);
+    ctx.moveTo(x + w, y); ctx.lineTo(x, y + h);
+    ctx.stroke();
+
+    const isFlipMode = !['ooxx', 'ooxx_boss', 'popup', 'score', 'bingo'].includes(stage.mode);
+    if (p.hit && isFlipMode) {
+      const cosA = Math.max(0.06, Math.cos(p.flipAngle));
+      ctx.fillStyle = '#94a3b8';
+      roundRect(ctx, x + 2, y + 1, w - 4, h * cosA, 3);
+      ctx.fill();
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(x + 4, y, w - 8, 3);
+      ctx.restore();
+      return;
+    }
+
+    // Popup mode: non-active panels lie folded down
+    if (stage.mode === 'popup' && !state.popupActive.includes(idx)) {
+      ctx.fillStyle = '#334155';
+      roundRect(ctx, x + 3, y + 2, w - 6, h * 0.14, 3);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    const shakeX = p.wrongShake > 0 ? Math.sin(p.wrongShake * 38) * 4 : 0;
+    ctx.translate(shakeX, 0);
+
+    const isSniperTarget = stage.mode === 'sniper' && p.isTarget;
+    const isSniperLocked = stage.mode === 'sniper' && !p.isTarget;
+    const isSeqTarget = stage.mode === 'sequence' && p.num === state.seqNext;
+    const isPopupActive = stage.mode === 'popup' && state.popupActive.includes(idx);
+    const isScore2x = stage.mode === 'score' && idx === state.doubleIdx;
+    const isBlackoutDark = stage.mode === 'blackout' && state.screen === 'playing' && state.blackoutTimer > 0.85;
+
+    if ((stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') && p.owner) {
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      if (p.owner === 'O') { grad.addColorStop(0, '#fffbeb'); grad.addColorStop(1, '#fde68a'); }
+      else { grad.addColorStop(0, '#fef2f2'); grad.addColorStop(1, '#fecaca'); }
+      ctx.fillStyle = grad;
+    } else if (p.isBomb) {
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, '#7f1d1d'); grad.addColorStop(1, '#450a0a');
+      ctx.fillStyle = grad;
+    } else if (p.isBlocked) {
+      ctx.fillStyle = '#334155';
+    } else if (stage.mode === 'bingo' && p.hit) {
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, '#bae6fd'); grad.addColorStop(1, '#38bdf8');
+      ctx.fillStyle = grad;
+    } else if (isSniperTarget || isSeqTarget || isScore2x || (stage.mode === 'bomb' && !p.isBomb)) {
+      const pulse = 0.5 + 0.5 * Math.sin(state.swayPhase * 5.2);
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, `rgba(254, 240, 138, ${0.65 + pulse * 0.35})`);
+      ctx.fillStyle = grad;
+    } else if (isPopupActive) {
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, '#ecfdf5'); grad.addColorStop(1, '#86efac');
+      ctx.fillStyle = grad;
+    } else if (isSniperLocked) {
+      ctx.fillStyle = '#475569';
+    } else if (isBlackoutDark) {
+      ctx.fillStyle = '#181c2b';
+    } else {
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, '#f8fafc'); grad.addColorStop(1, '#cbd5e1');
+      ctx.fillStyle = grad;
+    }
+
+    roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 4);
+    ctx.fill();
+
+    // Special borders
+    if (isSniperTarget || isSeqTarget || isScore2x) {
+      ctx.strokeStyle = isSeqTarget ? '#38bdf8' : '#f59e0b';
+      ctx.lineWidth = 2.6;
+      roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 4);
+      ctx.stroke();
+    } else if (p.isBomb) {
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.2;
+      roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 4);
+      ctx.stroke();
+    } else if (isBlackoutDark) {
+      ctx.strokeStyle = 'rgba(192, 132, 252, 0.25)';
+      ctx.lineWidth = 1.2;
+      roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 4);
+      ctx.stroke();
+    } else if (isHovered && !isSniperLocked && !p.owner && !p.isBlocked) {
+      ctx.strokeStyle = 'rgba(255, 122, 24, 0.85)';
+      ctx.lineWidth = 2.4;
+      roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 4);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+    ctx.fillRect(x + w * 0.18, y + 2, w * 0.64, 3);
+
+    if (p.hitFlash > 0) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${p.hitFlash * 0.65})`;
+      roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 4);
+      ctx.fill();
+    }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = x + w * 0.5;
+    const cy = y + h * 0.53;
+
+    if ((stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') && p.owner === 'O') {
+      ctx.strokeStyle = '#ea580c';
+      ctx.lineWidth = Math.max(5, w * 0.12);
+      ctx.beginPath(); ctx.arc(cx, y + h * 0.5, w * 0.29, 0, Math.PI * 2); ctx.stroke();
+    } else if ((stage.mode === 'ooxx' || stage.mode === 'ooxx_boss') && p.owner === 'X') {
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = Math.max(5, w * 0.12);
+      ctx.lineCap = 'round';
+      const d = w * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(cx - d, y + h * 0.5 - d); ctx.lineTo(cx + d, y + h * 0.5 + d);
+      ctx.moveTo(cx + d, y + h * 0.5 - d); ctx.lineTo(cx - d, y + h * 0.5 + d);
+      ctx.stroke();
+    } else if (p.isBomb) {
+      ctx.font = `${Math.round(h * 0.5)}px sans-serif`;
+      ctx.fillText('💣', cx, cy);
+    } else if (p.isBlocked) {
+      ctx.font = `${Math.round(h * 0.44)}px sans-serif`;
+      ctx.fillText('🔒', cx, cy);
+    } else if (stage.mode === 'score') {
+      ctx.fillStyle = isScore2x ? '#b45309' : '#1e293b';
+      ctx.font = `900 ${Math.round(h * 0.34)}px -apple-system, sans-serif`;
+      ctx.fillText(String(p.points), cx, y + h * (isScore2x ? 0.42 : 0.52));
+      if (isScore2x) {
+        ctx.fillStyle = '#ea580c';
+        ctx.font = `900 ${Math.round(h * 0.24)}px -apple-system, sans-serif`;
+        ctx.fillText('2×', cx, y + h * 0.74);
+      }
+    } else if (!isBlackoutDark) {
+      ctx.fillStyle = isSniperLocked ? 'rgba(226, 232, 240, 0.35)' : (stage.mode === 'bingo' && p.hit ? '#0c4a6e' : '#1e293b');
+      ctx.font = `900 ${Math.round(h * 0.62)}px -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif`;
+      ctx.fillText(String(p.num), cx, cy);
+    }
+
+    ctx.restore();
+  }
+
+  function drawBingoLines() {
+    if (STAGES[state.stageIndex].mode !== 'bingo' || !state.bingoLines.length || !state.boards.length) return;
+    const panels = state.boards[0].panels;
+    ctx.save();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.shadowColor = '#0ea5e9';
+    ctx.shadowBlur = 16;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    for (const line of state.bingoLines) {
+      const a = panels[line[0]], c = panels[line[2]];
+      ctx.beginPath();
+      ctx.moveTo(a.x + a.w * 0.5, a.y + a.h * 0.5);
+      ctx.lineTo(c.x + c.w * 0.5, c.y + c.h * 0.5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawWinLineIfAny() {
+    if (!state.winLine || !state.boards.length) return;
+    const panels = state.boards[0].panels;
+    const a = panels[state.winLine.indices[0]], c = panels[state.winLine.indices[2]];
+    ctx.save();
+    ctx.strokeStyle = state.winLine.winner === 'O' ? '#fbbf24' : '#ef4444';
+    ctx.shadowColor = state.winLine.winner === 'O' ? '#f59e0b' : '#dc2626';
+    ctx.shadowBlur = 18;
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(a.x + a.w * 0.5, a.y + a.h * 0.5);
+    ctx.lineTo(c.x + c.w * 0.5, c.y + c.h * 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawWoodenBallRack() {
+    const rackW = Math.min(340, W * 0.84);
+    const rackH = 76;
+    const rx = (W - rackW) / 2;
+    const ry = H - rackH - Math.max(10, H * 0.015);
+
+    ctx.save();
+    const woodGrad = ctx.createLinearGradient(rx, ry, rx, ry + rackH);
+    woodGrad.addColorStop(0, '#e8c799');
+    woodGrad.addColorStop(0.55, '#c99b63');
+    woodGrad.addColorStop(1, '#9c6f3e');
+
+    ctx.fillStyle = woodGrad;
+    ctx.beginPath();
+    ctx.moveTo(rx + 18, ry); ctx.lineTo(rx + rackW - 18, ry);
+    ctx.lineTo(rx + rackW, ry + rackH); ctx.lineTo(rx, ry + rackH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 245, 225, 0.38)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    const stage = STAGES[state.stageIndex];
+    const isDuel = stage.mode === 'ooxx' || stage.mode === 'ooxx_boss';
+    const showBalls = isDuel ? 6 : Math.min(6, state.ballsLeft);
+    const slots = 6;
+    const innerW = rackW - 60;
+    for (let i = 0; i < slots; i++) {
+      const cx = rx + 30 + (i + 0.5) * (innerW / slots);
+      const cy = ry + 36;
+      ctx.fillStyle = 'rgba(58, 36, 16, 0.65)';
+      ctx.beginPath(); ctx.ellipse(cx, cy + 6, 16.5, 9, 0, 0, Math.PI * 2); ctx.fill();
+      if (i < showBalls) drawOrangeBaseball(cx, cy, 17, i * 0.7);
+    }
+    ctx.restore();
+  }
+
+  function drawOrangeBaseball(x, y, r, rot = 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    const grad = ctx.createRadialGradient(-r * 0.32, -r * 0.32, r * 0.1, 0, 0, r);
+    grad.addColorStop(0, '#ffd080');
+    grad.addColorStop(0.35, '#ff8c1a');
+    grad.addColorStop(0.85, '#ea580c');
+    grad.addColorStop(1, '#9a3412');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.strokeStyle = 'rgba(154, 52, 18, 0.45)';
+    ctx.lineWidth = Math.max(1, r * 0.09);
+    ctx.beginPath(); ctx.arc(-r * 0.72, 0, r * 0.75, -0.75, 0.75); ctx.stroke();
+    ctx.beginPath(); ctx.arc(r * 0.72, 0, r * 0.75, Math.PI - 0.75, Math.PI + 0.75); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawActiveBall() {
+    if (!state.activeBall) return;
+    const b = state.activeBall;
+    const u = Math.min(1, b.t);
+    const pos = getBallPos(b, u);
+
+    for (let i = 0; i < b.trail.length; i++) {
+      const tr = b.trail[i];
+      const alpha = ((i + 1) / b.trail.length) * 0.28;
+      ctx.fillStyle = b.owner === 'boss' ? `rgba(248, 113, 113, ${alpha})` : `rgba(255, 160, 50, ${alpha})`;
+      ctx.beginPath(); ctx.arc(tr.x, tr.y, tr.r * 0.78, 0, Math.PI * 2); ctx.fill();
+    }
+    drawOrangeBaseball(pos.x, pos.y, pos.r, u * b.spin);
+  }
+
+  function drawReboundBalls() {
+    for (const rb of state.reboundBalls) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, rb.life);
+      drawOrangeBaseball(rb.x, rb.y, rb.r, rb.life * 8);
+      ctx.restore();
+    }
+  }
+
+  function drawBossReticle() {
+    if (!state.bossReticle) return;
+    const { x, y } = state.bossReticle;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(248, 113, 113, 0.88)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(x, y, 22, 0, Math.PI * 2);
+    ctx.moveTo(x - 14, y - 14); ctx.lineTo(x + 14, y + 14);
+    ctx.moveTo(x + 14, y - 14); ctx.lineTo(x - 14, y + 14);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawAimReticle() {
+    if (!state.aiming) return;
+    const sway = getSwayOffset();
+    const ax = state.aimX + sway.dx;
+    const ay = state.aimY + sway.dy;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 215, 130, 0.36)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 6]);
+    ctx.beginPath();
+    ctx.moveTo(W * 0.5, H - 64);
+    ctx.quadraticCurveTo((W * 0.5 + ax) * 0.5, Math.min(H - 64, ay) - 60, ax, ay);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const outerR = 36 - state.focusQuality * 19;
+    const isSweet = state.focusQuality > 0.85;
+    ctx.strokeStyle = isSweet ? '#4ade80' : '#fbbf24';
+    ctx.lineWidth = isSweet ? 3.2 : 2.2;
+    ctx.beginPath(); ctx.arc(ax, ay, outerR, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(ax, ay, 7, 0, Math.PI * 2);
+    ctx.moveTo(ax - 13, ay); ctx.lineTo(ax - 5, ay);
+    ctx.moveTo(ax + 5, ay); ctx.lineTo(ax + 13, ay);
+    ctx.moveTo(ax, ay - 13); ctx.lineTo(ax, ay - 5);
+    ctx.moveTo(ax, ay + 5); ctx.lineTo(ax, ay + 13);
+    ctx.stroke();
+
+    ctx.fillStyle = isSweet ? '#4ade80' : '#ff7a18';
+    ctx.beginPath(); ctx.arc(ax, ay, 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (const pt of state.particles) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+      ctx.fillStyle = pt.color;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    for (const fw of state.fireworks) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, fw.life / fw.maxLife);
+      ctx.fillStyle = fw.color;
+      ctx.shadowColor = fw.color;
+      ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(fw.x, fw.y, fw.size, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.lineTo(x + w - r, y);
+    c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r);
+    c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h);
+    c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r);
+    c.quadraticCurveTo(x, y, x + r, y);
+    c.closePath();
+  }
+
+  // =========================================================================
+  // 11. BOOTSTRAP
+  // =========================================================================
+  function loop(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min(0.05, (ts - lastTime) / 1000);
+    lastTime = ts;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('load', () => {
+    initStage(0, true);
+    resize();
+    requestAnimationFrame(loop);
+  });
+})();
+</script>
+</body>
+</html>
